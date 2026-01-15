@@ -1,0 +1,231 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+import uuid
+
+db = SQLAlchemy()
+
+
+class Usuario(db.Model):
+    __tablename__ = 'usuarios'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    senha = db.Column(db.String(255), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)  # admin, gestor, plantonista
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    plantonista = db.relationship('Plantonista', backref='usuario', uselist=False, cascade='all, delete-orphan')
+    logs = db.relationship('Log', backref='usuario', lazy='dynamic')
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'nome': self.nome,
+            'email': self.email,
+            'tipo': self.tipo,
+            'ativo': self.ativo,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class Plantonista(db.Model):
+    __tablename__ = 'plantonistas'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    usuario_id = db.Column(db.String(36), db.ForeignKey('usuarios.id', ondelete='CASCADE'))
+    pontuacao_total = db.Column(db.Float, default=0)
+    ranking = db.Column(db.Integer, default=999)
+    max_plantoes_mes = db.Column(db.Integer, default=13)
+    preferencias = db.Column(db.JSON)
+    google_calendar_id = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    pontuacoes = db.relationship('Pontuacao', backref='plantonista', lazy='dynamic', cascade='all, delete-orphan')
+    alocacoes = db.relationship('Alocacao', backref='plantonista', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'usuario_id': str(self.usuario_id),
+            'nome': self.usuario.nome if self.usuario else None,
+            'email': self.usuario.email if self.usuario else None,
+            'pontuacao_total': float(self.pontuacao_total) if self.pontuacao_total else 0,
+            'ranking': self.ranking,
+            'max_plantoes_mes': self.max_plantoes_mes,
+            'preferencias': self.preferencias,
+            'google_calendar_id': self.google_calendar_id
+        }
+
+
+class Pontuacao(db.Model):
+    __tablename__ = 'pontuacao'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    plantonista_id = db.Column(db.String(36), db.ForeignKey('plantonistas.id', ondelete='CASCADE'))
+    mes_referencia = db.Column(db.Date, nullable=False)
+    vendas = db.Column(db.Integer, default=0)
+    agenciamentos_vendidos = db.Column(db.Integer, default=0)
+    age_bairro_foco = db.Column(db.Integer, default=0)
+    age_canoas_poa = db.Column(db.Integer, default=0)
+    age_outros = db.Column(db.Integer, default=0)
+    acima_1mm = db.Column(db.Integer, default=0)
+    placa_bairro_foco = db.Column(db.Float, default=0)
+    placa_canoas_poa = db.Column(db.Float, default=0)
+    placa_outros = db.Column(db.Float, default=0)
+    pontos_vendas = db.Column(db.Float, default=0)
+    pontos_agenciamentos = db.Column(db.Float, default=0)
+    pontos_placas = db.Column(db.Float, default=0)
+    pontos_total = db.Column(db.Float, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'plantonista_id': str(self.plantonista_id),
+            'mes_referencia': self.mes_referencia.isoformat() if self.mes_referencia else None,
+            'vendas': self.vendas,
+            'agenciamentos_vendidos': self.agenciamentos_vendidos,
+            'age_bairro_foco': self.age_bairro_foco,
+            'age_canoas_poa': self.age_canoas_poa,
+            'age_outros': self.age_outros,
+            'acima_1mm': self.acima_1mm,
+            'placa_bairro_foco': float(self.placa_bairro_foco) if self.placa_bairro_foco else 0,
+            'placa_canoas_poa': float(self.placa_canoas_poa) if self.placa_canoas_poa else 0,
+            'placa_outros': float(self.placa_outros) if self.placa_outros else 0,
+            'pontos_vendas': float(self.pontos_vendas) if self.pontos_vendas else 0,
+            'pontos_agenciamentos': float(self.pontos_agenciamentos) if self.pontos_agenciamentos else 0,
+            'pontos_placas': float(self.pontos_placas) if self.pontos_placas else 0,
+            'pontos_total': float(self.pontos_total) if self.pontos_total else 0
+        }
+
+
+class Plantao(db.Model):
+    __tablename__ = 'plantoes'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    data = db.Column(db.Date, nullable=False)
+    turno = db.Column(db.String(10), nullable=False)  # manha, tarde
+    status = db.Column(db.String(20), default='disponivel')
+    max_plantonistas = db.Column(db.Integer, default=2)
+    observacoes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relacionamentos
+    alocacoes = db.relationship('Alocacao', backref='plantao', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'data': self.data.isoformat() if self.data else None,
+            'turno': self.turno,
+            'status': self.status,
+            'max_plantonistas': self.max_plantonistas,
+            'observacoes': self.observacoes,
+            'alocacoes_count': self.alocacoes.count(),
+            'vagas_disponiveis': self.max_plantonistas - self.alocacoes.filter_by(status='confirmado').count()
+        }
+
+
+class Alocacao(db.Model):
+    __tablename__ = 'alocacoes'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    plantao_id = db.Column(db.String(36), db.ForeignKey('plantoes.id', ondelete='CASCADE'))
+    plantonista_id = db.Column(db.String(36), db.ForeignKey('plantonistas.id', ondelete='CASCADE'))
+    status = db.Column(db.String(20), default='pendente')
+    tipo = db.Column(db.String(20), default='escolha')
+    confirmado_em = db.Column(db.DateTime)
+    google_event_id = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'plantao_id': str(self.plantao_id),
+            'plantonista_id': str(self.plantonista_id),
+            'plantonista_nome': self.plantonista.usuario.nome if self.plantonista and self.plantonista.usuario else None,
+            'status': self.status,
+            'tipo': self.tipo,
+            'confirmado_em': self.confirmado_em.isoformat() if self.confirmado_em else None,
+            'google_event_id': self.google_event_id
+        }
+
+
+class Troca(db.Model):
+    __tablename__ = 'trocas'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    alocacao_origem_id = db.Column(db.String(36), db.ForeignKey('alocacoes.id', ondelete='CASCADE'))
+    plantonista_origem_id = db.Column(db.String(36), db.ForeignKey('plantonistas.id'))
+    plantonista_destino_id = db.Column(db.String(36), db.ForeignKey('plantonistas.id'))
+    status = db.Column(db.String(20), default='pendente')
+    motivo = db.Column(db.Text)
+    aprovado_por = db.Column(db.String(36), db.ForeignKey('usuarios.id'))
+    aprovado_em = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'alocacao_origem_id': str(self.alocacao_origem_id),
+            'plantonista_origem_id': str(self.plantonista_origem_id),
+            'plantonista_destino_id': str(self.plantonista_destino_id),
+            'status': self.status,
+            'motivo': self.motivo,
+            'aprovado_por': str(self.aprovado_por) if self.aprovado_por else None,
+            'aprovado_em': self.aprovado_em.isoformat() if self.aprovado_em else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class Configuracao(db.Model):
+    __tablename__ = 'configuracoes'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    chave = db.Column(db.String(100), unique=True, nullable=False)
+    valor = db.Column(db.JSON, nullable=False)
+    descricao = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'chave': self.chave,
+            'valor': self.valor,
+            'descricao': self.descricao
+        }
+
+
+class Log(db.Model):
+    __tablename__ = 'logs'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    usuario_id = db.Column(db.String(36), db.ForeignKey('usuarios.id'))
+    acao = db.Column(db.String(100), nullable=False)
+    tabela = db.Column(db.String(50))
+    registro_id = db.Column(db.String(36))
+    detalhes = db.Column(db.JSON)
+    ip_address = db.Column(db.String(45))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'usuario_id': str(self.usuario_id) if self.usuario_id else None,
+            'acao': self.acao,
+            'tabela': self.tabela,
+            'registro_id': str(self.registro_id) if self.registro_id else None,
+            'detalhes': self.detalhes,
+            'ip_address': self.ip_address,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
