@@ -17,6 +17,9 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
     
     # Inicializar extensões
+    import logging
+    logging.getLogger('flask_cors').level = logging.DEBUG
+    
     db.init_app(app)
     CORS(app, resources={
         r"/*": {
