@@ -25,9 +25,19 @@ def create_app(config_name='development'):
         r"/*": {
             "origins": app.config['CORS_ORIGINS'],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+            "supports_credentials": True
         }
     })
+    
+    # Log de todas as requisições para debug de CORS
+    @app.before_request
+    def log_request_info():
+        if app.debug or os.getenv('FLASK_ENV') == 'production':
+            app.logger.debug(f"Handling {request.method} request from {request.remote_addr} to {request.path}")
+            app.logger.debug(f"Origin: {request.headers.get('Origin')}")
+            app.logger.debug(f"Headers: {dict(request.headers)}")
+
     JWTManager(app)
     Bcrypt(app)
     
