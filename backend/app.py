@@ -96,6 +96,17 @@ def create_app(config_name='development'):
     # Criar tabelas se não existirem
     with app.app_context():
         db.create_all()
+        
+        # Auto-seed: Tenta criar usuário admin. Se não existir, popula tudo.
+        try:
+            from models import Usuario
+            if not Usuario.query.filter_by(email='admin@veloce.com').first():
+                print("⚠️ Banco vazio detectado. Iniciando auto-seed...")
+                from seed_data import populate_db
+                populate_db()
+                print("✅ Auto-seed concluído com sucesso!")
+        except Exception as e:
+            print(f"❌ Erro no auto-seed: {e}")
     
     return app
 
