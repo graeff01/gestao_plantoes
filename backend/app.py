@@ -16,9 +16,9 @@ def create_app(config_name='development'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
     
-    # Inicializar extensõesssss
+    # Inicializar extensões
     db.init_app(app)
-        CORS(app, resources={
+    CORS(app, resources={
         r"/*": {
             "origins": app.config['CORS_ORIGINS'],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
