@@ -18,8 +18,8 @@ def create_app(config_name='development'):
     
     # Inicializar extensões
     db.init_app(app)
-    CORS(app, resources={
-        r"/api/*": {
+        CORS(app, resources={
+        r"/*": {
             "origins": app.config['CORS_ORIGINS'],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"]
