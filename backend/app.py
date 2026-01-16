@@ -95,10 +95,10 @@ if __name__ == '__main__':
     debug = os.getenv('DEBUG', 'True') == 'True'
     
     print(f"""
-    ╔════════════════════════════════════════════════════╗
     ║   Sistema de Gestão de Plantões - Veloce          ║
     ║   Backend API rodando em: http://localhost:{port}   ║
     ║   Ambiente: {env}                          ║
+    ║   CORS Origins: {app.config['CORS_ORIGINS']}   ║
     ╚════════════════════════════════════════════════════╝
     """)
     

@@ -23,7 +23,8 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
     
     # CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
+    CORS_ORIGINS_RAW = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173')
+    CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS_RAW.split(',') if origin.strip()]
     
     # Resto das configurações...
     TIMEZONE = 'America/Sao_Paulo'
