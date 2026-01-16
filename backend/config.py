@@ -24,7 +24,7 @@ class Config:
     
     # CORS
     # Adicionando a URL do frontend do usuário diretamente nos defaults para facilitar
-    CORS_ORIGINS_RAW = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,https://zoological-enchantment-production.up.railway.app')
+    CORS_ORIGINS_RAW = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,https://zoological-enchantment-production.up.railway.app,https://gestaoplantao.up.railway.app')
     # Separa por vírgula, remove espaços E remove barra no final (trailing slash) para evitar mismatch
     CORS_ORIGINS = [origin.strip().rstrip('/') for origin in CORS_ORIGINS_RAW.split(',') if origin.strip()]
     
