@@ -58,9 +58,6 @@ def create_app(config_name='development'):
     app.register_blueprint(plantao_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(health_bp)
-    app.register_blueprint(pontuacao_bp)
-    app.register_blueprint(plantao_bp)
-    app.register_blueprint(logs_bp)
     
     # Rotas de saúde e info
     @app.route('/')
