@@ -67,8 +67,9 @@ const RealtimeNotifications = () => {
 
   return (
     <>
-      {/* Status de conexão */}
-      <div className="fixed top-4 right-4 z-50">
+      {/* Status de conexão - removido para evitar duplicação com "Sistema Operacional" */}
+      {false && (
+      <div className="fixed top-16 right-4 z-40">
         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
           isConnected 
             ? 'bg-green-100 text-green-800' 
@@ -80,6 +81,7 @@ const RealtimeNotifications = () => {
           {isConnected ? 'Conectado' : 'Desconectado'}
         </div>
       </div>
+      )}
 
       {/* Notificação flutuante */}
       {showNotification && notifications.length > 0 && (

@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { FiCalendar, FiUsers, FiAward, FiTrendingUp, FiActivity, FiBarChart, FiPieChart } from 'react-icons/fi';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+import useWebSocket from '../hooks/useWebSocket';
 
 // Importar componentes BI
 import { 
@@ -34,6 +35,9 @@ export default function Dashboard() {
 
   // Hook para dados BI
   const biData = useBIData();
+  
+  // Hook para conectividade WebSocket
+  const { isConnected } = useWebSocket();
 
   const isGestor = ['admin', 'gestor'].includes(user?.tipo);
 
@@ -133,17 +137,21 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col h-full space-y-4 overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 mb-2">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">
             Olá, <span className="text-blue-600">{user?.nome.split(' ')[0]}</span>!
           </h1>
           <p className="text-gray-500 font-medium text-sm">Veja o que está acontecendo no sistema hoje.</p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="flex items-center space-x-2 text-sm font-bold bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-gray-600">Sistema Operacional</span>
+            <div className={`w-2 h-2 rounded-full animate-pulse ${
+              isConnected ? 'bg-green-500' : 'bg-yellow-500'
+            }`}></div>
+            <span className="text-gray-600">
+              Sistema {isConnected ? 'Conectado' : 'Operacional'}
+            </span>
           </div>
           
           {/* Toggle BI Avançado (apenas para gestores) */}
