@@ -155,6 +155,12 @@ def escolher_plantao(plantao_id):
     try:
         print(f"DEBUG escolher_plantao: plantao_id={plantao_id}")
         
+        # Validar formato UUID
+        try:
+            uuid.UUID(plantao_id)
+        except ValueError:
+            return criar_erro('ID do plantão inválido', 400)
+        
         user = get_current_user()
         print(f"DEBUG escolher_plantao: user={user.id if user else 'None'}, tipo={user.tipo if user else 'None'}")
         
@@ -535,6 +541,12 @@ def atribuir_plantonista(plantao_id):
     try:
         print(f"DEBUG atribuir_plantonista: plantao_id={plantao_id}")
         
+        # Validar formato UUID do plantão
+        try:
+            uuid.UUID(plantao_id)
+        except ValueError:
+            return criar_erro('ID do plantão inválido', 400)
+        
         data = request.get_json()
         print(f"DEBUG atribuir_plantonista: data={data}")
         
@@ -542,6 +554,12 @@ def atribuir_plantonista(plantao_id):
         
         if not plantonista_id:
             return criar_erro('plantonista_id é obrigatório', 400)
+            
+        # Validar formato UUID do plantonista
+        try:
+            uuid.UUID(plantonista_id)
+        except ValueError:
+            return criar_erro('ID do plantonista inválido', 400)
         
         # Operações sem transação dupla
         try:
