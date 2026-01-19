@@ -566,29 +566,28 @@ def atribuir_plantonista(plantao_id):
             plantao = Plantao.query.get(plantao_id)
             print(f"DEBUG atribuir_plantonista: plantao query result={plantao}")
             
-            # Tentar buscar plantonista por ID direto
-            plantonista = Plantonista.query.get(plantonista_id)
-            print(f"DEBUG atribuir_plantonista: plantonista direct query={plantonista}")
+            # CORREÇÃO: O frontend provavelmente está enviando usuario_id, não plantonista_id
+            # Primeiro tentar buscar como usuario_id
+            plantonista = Plantonista.query.filter_by(usuario_id=plantonista_id).first()
+            print(f"DEBUG atribuir_plantonista: plantonista by usuario_id={plantonista}")
             
-            # Se não encontrou, tentar buscar por usuario_id (caso frontend esteja enviando usuario_id)
+            # Se não encontrou, tentar buscar por ID direto (caso seja realmente plantonista_id)
             if not plantonista:
-                plantonista = Plantonista.query.filter_by(usuario_id=plantonista_id).first()
-                print(f"DEBUG atribuir_plantonista: plantonista by usuario_id={plantonista}")
-            
-            # Buscar também por nome para debug
-            if data and 'nome' in data:
-                plantonista_por_nome = Plantonista.query.join(Usuario).filter(Usuario.nome.ilike(f"%{data['nome']}%")).first()
-                print(f"DEBUG atribuir_plantonista: plantonista by name={plantonista_por_nome}")
+                plantonista = Plantonista.query.get(plantonista_id)
+                print(f"DEBUG atribuir_plantonista: plantonista direct query={plantonista}")
             
             print(f"DEBUG atribuir_plantonista: plantao found={plantao is not None}, plantonista found={plantonista is not None}")
             
-            if not plantao or not plantonista:
-                return criar_erro('Plantão ou Plantonista não encontrado', 404)
+            if not plantao:
+                return criar_erro('Plantão não encontrado', 404)
+                
+            if not plantonista:
+                return criar_erro('Plantonista não encontrado. Verifique se o usuário tem registro de plantonista.', 404)
             
-            # Verificar alocação existente
+            # Verificar alocação existente - usar o ID correto do plantonista
             alocacao_existente = Alocacao.query.filter_by(
                 plantao_id=plantao_id,
-                plantonista_id=plantonista_id,
+                plantonista_id=plantonista.id,  # Usar plantonista.id, não plantonista_id do request
                 status='confirmado'
             ).first()
             
@@ -597,7 +596,7 @@ def atribuir_plantonista(plantao_id):
                 
             # Verificar se já tem outro plantão no mesmo DIA
             outro_plantao_dia = Alocacao.query.join(Plantao).filter(
-                Alocacao.plantonista_id == plantonista_id,
+                Alocacao.plantonista_id == plantonista.id,  # Usar plantonista.id correto
                 Alocacao.status == 'confirmado',
                 Plantao.data == plantao.data
             ).first()
@@ -616,7 +615,7 @@ def atribuir_plantonista(plantao_id):
                 
             alocacao = Alocacao(
                 plantao_id=plantao_id,
-                plantonista_id=plantonista_id,
+                plantonista_id=plantonista.id,  # Usar o ID correto do plantonista
                 status='confirmado',
                 tipo='atribuido',
                 confirmado_em=datetime.utcnow()
@@ -659,10 +658,18 @@ def remover_alocacao(plantao_id):
         
         if not plantonista_id:
             return criar_erro('plantonista_id é obrigatório', 400)
+        
+        # Buscar plantonista pelo usuario_id primeiro (mesmo padrão do atribuir)
+        plantonista = Plantonista.query.filter_by(usuario_id=plantonista_id).first()
+        if not plantonista:
+            plantonista = Plantonista.query.get(plantonista_id)
+        
+        if not plantonista:
+            return criar_erro('Plantonista não encontrado', 404)
             
         alocacao = Alocacao.query.filter_by(
             plantao_id=plantao_id, 
-            plantonista_id=plantonista_id,
+            plantonista_id=plantonista.id,  # Usar o ID correto do plantonista
             status='confirmado'
         ).first()
         
