@@ -15,8 +15,9 @@ import LogsPage from './pages/LogsPage';
 // Store
 import { useAuthStore } from './store/authStore';
 
-// Layout
+// Layout & Components
 import Layout from './components/Layout';
+import RealtimeNotifications from './components/RealtimeNotifications';
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuthStore();
@@ -24,6 +25,8 @@ function PrivateRoute({ children }) {
 }
 
 function App() {
+  const { isAuthenticated } = useAuthStore();
+  
   return (
     <BrowserRouter>
       <ToastContainer
@@ -37,6 +40,9 @@ function App() {
         draggable
         pauseOnHover
       />
+
+      {/* Notificações em tempo real - apenas quando logado */}
+      {isAuthenticated && <RealtimeNotifications />}
 
       <Routes>
         <Route path="/login" element={<Login />} />

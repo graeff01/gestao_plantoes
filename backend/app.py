@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
+from flask_socketio import SocketIO, emit
+from flask_caching import Cache
 from config import config
 from models import db
 import os
@@ -27,6 +29,20 @@ def create_app(config_name='development'):
         logging.getLogger('flask_cors').level = logging.DEBUG
     
     db.init_app(app)
+    
+    # Configurar Cache Redis
+    cache = Cache()
+    try:
+        cache.init_app(app)
+        print("✅ Redis cache configurado com sucesso")
+    except Exception as e:
+        print(f"⚠️ Erro ao configurar cache Redis: {e}")
+        # Fallback para SimpleCache se Redis não estiver disponível
+        app.config['CACHE_TYPE'] = 'simple'
+        cache.init_app(app)
+        print("📝 Usando SimpleCache como fallback")
+    
+    # Configurar CORS para Socket.IO
     CORS(app, resources={
         r"/*": {
             "origins": app.config['CORS_ORIGINS'],
@@ -46,6 +62,10 @@ def create_app(config_name='development'):
     JWTManager(app)
     Bcrypt(app)
     
+    # Configurar Socket.IO
+    socketio = SocketIO(app, cors_allowed_origins=app.config['CORS_ORIGINS'], 
+                       logger=False, engineio_logger=False)
+    
     # Registrar blueprints
     from routes.auth import auth_bp
     from routes.pontuacao import pontuacao_bp
@@ -58,6 +78,27 @@ def create_app(config_name='development'):
     app.register_blueprint(plantao_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(health_bp)
+    
+    # Configurar eventos Socket.IO
+    @socketio.on('connect')
+    def handle_connect():
+        print(f'Cliente conectado: {request.sid}')
+        emit('connected', {'data': 'Conectado ao servidor de plantões'})
+    
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        print(f'Cliente desconectado: {request.sid}')
+    
+    @socketio.on('join_room')
+    def handle_join_room(data):
+        """Usuário entra em sala específica (ex: sala de plantonistas)"""
+        room = data.get('room', 'general')
+        socketio.join_room(room)
+        print(f'Cliente {request.sid} entrou na sala {room}')
+    
+    # Adicionar SocketIO e Cache ao contexto da aplicação
+    app.socketio = socketio
+    app.cache = cache
     
     # Rotas de saúde e info
     @app.route('/')
@@ -115,12 +156,12 @@ def create_app(config_name='development'):
         except Exception as e:
             print(f"❌ Erro no auto-seed: {e}")
     
-    return app
+    return app, socketio
 
 
 if __name__ == '__main__':
     env = os.getenv('FLASK_ENV', 'development')
-    app = create_app(env)
+    app, socketio = create_app(env)
     
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('DEBUG', 'True') == 'True'
@@ -130,10 +171,12 @@ if __name__ == '__main__':
     ║   Backend API rodando em: http://localhost:{port}   ║
     ║   Ambiente: {env}                          ║
     ║   CORS Origins: {app.config['CORS_ORIGINS']}   ║
+    ║   SocketIO: Habilitado para real-time updates     ║
     ╚════════════════════════════════════════════════════╝
     """)
     
-    app.run(
+    socketio.run(
+        app,
         host='0.0.0.0',
         port=port,
         debug=debug

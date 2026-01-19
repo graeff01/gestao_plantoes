@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required
 from models import db, Pontuacao, Plantonista, Usuario, Plantao, Alocacao
 from utils.auth import gestor_required, criar_resposta, criar_erro, log_acao, get_current_user
 from utils.pontuacao import CalculadoraPontuacao
+from utils.cache_utils import cached_function, invalidate_rankings_cache, invalidate_stats_cache
 from datetime import datetime, date
 import uuid
 
@@ -11,6 +12,7 @@ pontuacao_bp = Blueprint('pontuacao', __name__, url_prefix='/api/pontuacao')
 
 @pontuacao_bp.route('/ranking', methods=['GET'])
 @jwt_required()
+@cached_function(timeout=1800, key_prefix='ranking')  # Cache por 30 minutos
 def get_ranking():
     """Retorna o ranking atual dos plantonistas"""
     try:
@@ -124,6 +126,10 @@ def criar_pontuacao():
             log_acao(user.id, 'criar_pontuacao', 'pontuacao', pontuacao.id, detalhes=dados_pontuacao)
             
             db.session.commit()
+            
+            # Invalidar cache de rankings após nova pontuação
+            invalidate_rankings_cache()
+            invalidate_stats_cache()
                 
         except Exception as e:
             db.session.rollback()

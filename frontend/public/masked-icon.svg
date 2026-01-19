@@ -1,0 +1,6 @@
+<!-- Placeholder SVG for PWA -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="#2563eb">
+  <rect width="512" height="512" fill="#2563eb" rx="64"/>
+  <path d="M256 128c-70.7 0-128 57.3-128 128s57.3 128 128 128 128-57.3 128-128-57.3-128-128-128zm0 192c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64z" fill="white"/>
+  <text x="256" y="400" text-anchor="middle" fill="white" font-size="48" font-family="Arial">VP</text>
+</svg>

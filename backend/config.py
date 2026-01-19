@@ -38,6 +38,27 @@ class Config:
     PONTOS_PLACA_FOCO = 1.0
     PONTOS_PLACA_OUTROS = 0.5
     MAX_PLANTONISTAS_POR_TURNO = 2
+    
+    # Cache Redis
+    CACHE_TYPE = 'redis'
+    CACHE_REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    CACHE_DEFAULT_TIMEOUT = 300  # 5 minutos
+    
+    # Cache específico para diferentes tipos de dados
+    CACHE_CONFIG = {
+        'rankings': {
+            'timeout': 1800,  # 30 minutos
+            'key_prefix': 'ranking_'
+        },
+        'estatisticas': {
+            'timeout': 3600,  # 1 hora
+            'key_prefix': 'stats_'
+        },
+        'plantoes_mes': {
+            'timeout': 600,   # 10 minutos
+            'key_prefix': 'plantoes_'
+        }
+    }
 
 
 class DevelopmentConfig(Config):

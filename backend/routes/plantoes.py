@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from models import db, Plantao, Alocacao, Plantonista, Usuario
 from utils.auth import gestor_required, criar_resposta, criar_erro, log_acao, get_current_user
+from utils.websocket import notify_plantao_update, notify_alocacao_update
+from utils.cache_utils import cached_function, invalidate_plantoes_cache, invalidate_rankings_cache
 from datetime import datetime, date, timedelta
 from calendar import monthrange
 import uuid
@@ -11,6 +13,7 @@ plantao_bp = Blueprint('plantao', __name__, url_prefix='/api/plantoes')
 
 @plantao_bp.route('', methods=['GET'])
 @jwt_required()
+@cached_function(timeout=600, key_prefix='plantoes')  # Cache por 10 minutos
 def get_plantoes():
     """Retorna todos os plantões filtrados por data"""
     try:
@@ -319,6 +322,17 @@ def escolher_plantao(plantao_id):
                 'data': plantao.data.isoformat(),
                 'turno': plantao.turno
             })
+            
+            # Notificação WebSocket em tempo real
+            try:
+                notify_plantao_update(plantao.to_dict(), 'plantao_updated')
+                notify_alocacao_update(alocacao.to_dict(), 'alocacao_created')
+            except Exception as ws_error:
+                print(f"Erro WebSocket (não crítico): {ws_error}")
+            
+            # Invalidar cache após mudança
+            invalidate_plantoes_cache()
+            invalidate_rankings_cache()
             
         except Exception as e:
             db.session.rollback()
