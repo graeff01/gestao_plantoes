@@ -514,58 +514,76 @@ def atribuir_plantonista(plantao_id):
         if not plantonista_id:
             return criar_erro('plantonista_id é obrigatório', 400)
         
-        plantao = Plantao.query.get(plantao_id)
-        plantonista = Plantonista.query.get(plantonista_id)
+        # Transação atômica para proteção contra concorrência
+        try:
+            with db.session.begin():
+                plantao = Plantao.query.get(plantao_id)
+                plantonista = Plantonista.query.get(plantonista_id)
+                
+                if not plantao or not plantonista:
+                    return criar_erro('Plantão ou Plantonista não encontrado', 404)
+                
+                # Verificar alocação existente
+                alocacao_existente = Alocacao.query.filter_by(
+                    plantao_id=plantao_id,
+                    plantonista_id=plantonista_id,
+                    status='confirmado'
+                ).first()
+                
+                if alocacao_existente:
+                    return criar_erro('Plantonista já está alocado neste plantão', 400)
+                    
+                # Verificar se já tem outro plantão no mesmo DIA
+                outro_plantao_dia = Alocacao.query.join(Plantao).filter(
+                    Alocacao.plantonista_id == plantonista_id,
+                    Alocacao.status == 'confirmado',
+                    Plantao.data == plantao.data
+                ).first()
+                
+                if outro_plantao_dia:
+                    return criar_erro('Não é permitido que um plantonista faça dois turnos no mesmo dia', 400)
+                
+                # Verificar se há vagas
+                alocacoes_atuais = Alocacao.query.filter_by(
+                    plantao_id=plantao_id, 
+                    status='confirmado'
+                ).count()
+                
+                if alocacoes_atuais >= plantao.max_plantonistas:
+                    return criar_erro('Plantão já está lotado', 400)
+                    
+                alocacao = Alocacao(
+                    plantao_id=plantao_id,
+                    plantonista_id=plantonista_id,
+                    status='confirmado',
+                    tipo='atribuido',
+                    confirmado_em=datetime.utcnow()
+                )
+                
+                db.session.add(alocacao)
+                
+                # Atualizar status do plantão
+                if (alocacoes_atuais + 1) >= plantao.max_plantonistas:
+                    plantao.status = 'confirmado'
+                else:
+                    plantao.status = 'reservado'
+                
+                # Log
+                user = get_current_user()
+                log_acao(user.id, 'atribuir_plantonista', 'alocacoes', alocacao.id)
+                
+                # Commit implícito pelo context manager
+                
+        except Exception as e:
+            db.session.rollback()
+            raise e
         
-        if not plantao or not plantonista:
-            return criar_erro('Plantão ou Plantonista não encontrado', 404)
-        
-        alocacao_existente = Alocacao.query.filter_by(
-            plantao_id=plantao_id,
-            plantonista_id=plantonista_id,
-            status='confirmado'
-        ).first()
-        
-        if alocacao_existente:
-            return criar_erro('Plantonista já está alocado neste plantão', 400)
-            
-        # Verificar se já tem outro plantão no mesmo DIA (Manhã + Tarde não permitido)
-        outro_plantao_dia = Alocacao.query.join(Plantao).filter(
-            Alocacao.plantonista_id == plantonista_id,
-            Alocacao.status == 'confirmado',
-            Plantao.data == plantao.data
-        ).first()
-        
-        if outro_plantao_dia:
-            return criar_erro('Não é permitido que um plantonista faça dois turnos no mesmo dia', 400)
-            
-        alocacao = Alocacao(
-            plantao_id=plantao_id,
-            plantonista_id=plantonista_id,
-            status='confirmado',
-            tipo='atribuido',
-            confirmado_em=datetime.utcnow()
+        return criar_resposta(
+            mensagem='Plantonista atribuído com sucesso', 
+            dados={'alocacao': alocacao.to_dict()}
         )
         
-        db.session.add(alocacao)
-        
-        # Atualizar status do plantão
-        alocacoes_count = Alocacao.query.filter_by(plantao_id=plantao_id, status='confirmado').count() + 1
-        if alocacoes_count >= plantao.max_plantonistas:
-            plantao.status = 'confirmado'
-        else:
-            plantao.status = 'reservado'
-        
-        db.session.commit()
-        
-        # Log
-        user = get_current_user()
-        log_acao(user.id, 'atribuir_plantonista', 'alocacoes', alocacao.id)
-        
-        return criar_resposta(mensagem='Plantonista atribuído com sucesso', dados={'alocacao': alocacao.to_dict()})
-        
     except Exception as e:
-        db.session.rollback()
         return criar_erro(f'Erro ao atribuir plantonista: {str(e)}', 500)
 
 @plantao_bp.route('/<plantao_id>/remover-alocacao', methods=['DELETE'])
