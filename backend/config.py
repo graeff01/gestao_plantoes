@@ -42,10 +42,37 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    
+    # Pool de conexões para desenvolvimento
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 3600,
+        'pool_size': 5,
+        'max_overflow': 10,
+        'pool_timeout': 30
+    }
 
 
 class ProductionConfig(Config):
     DEBUG = False
+    
+    # Configurações específicas de produção
+    SQLALCHEMY_ECHO = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 3600,
+        'pool_size': 10,
+        'max_overflow': 20,
+        'pool_timeout': 30
+    }
+    
+    # Validações de segurança
+    def __init__(self):
+        super().__init__()
+        if self.SECRET_KEY == 'dev-secret-key-change-in-production':
+            raise ValueError("SECRET_KEY deve ser alterada em produção!")
+        if self.JWT_SECRET_KEY == 'jwt-secret-key-change-in-production':
+            raise ValueError("JWT_SECRET_KEY deve ser alterada em produção!")
 
 
 class TestingConfig(Config):

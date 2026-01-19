@@ -18,7 +18,13 @@ def create_app(config_name='development'):
     
     # Inicializar extensões
     import logging
-    logging.getLogger('flask_cors').level = logging.DEBUG
+    
+    # Configurar logs baseado no ambiente
+    if config_name == 'production':
+        logging.getLogger('flask_cors').level = logging.WARNING
+        logging.getLogger('werkzeug').level = logging.WARNING
+    else:
+        logging.getLogger('flask_cors').level = logging.DEBUG
     
     db.init_app(app)
     CORS(app, resources={
@@ -30,13 +36,12 @@ def create_app(config_name='development'):
         }
     })
     
-    # Log de todas as requisições para debug de CORS
+    # Log de requisições apenas em desenvolvimento
     @app.before_request
     def log_request_info():
-        if app.debug or os.getenv('FLASK_ENV') == 'production':
+        if app.debug and config_name != 'production':
             app.logger.debug(f"Handling {request.method} request from {request.remote_addr} to {request.path}")
             app.logger.debug(f"Origin: {request.headers.get('Origin')}")
-            app.logger.debug(f"Headers: {dict(request.headers)}")
 
     JWTManager(app)
     Bcrypt(app)
@@ -46,8 +51,13 @@ def create_app(config_name='development'):
     from routes.pontuacao import pontuacao_bp
     from routes.plantoes import plantao_bp
     from routes.logs import logs_bp
+    from routes.health import health_bp
     
     app.register_blueprint(auth_bp)
+    app.register_blueprint(pontuacao_bp)
+    app.register_blueprint(plantao_bp)
+    app.register_blueprint(logs_bp)
+    app.register_blueprint(health_bp)
     app.register_blueprint(pontuacao_bp)
     app.register_blueprint(plantao_bp)
     app.register_blueprint(logs_bp)
