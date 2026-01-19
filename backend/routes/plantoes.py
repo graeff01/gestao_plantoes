@@ -153,7 +153,11 @@ def gerar_plantoes_mes():
 def escolher_plantao(plantao_id):
     """Plantonista escolhe um plantão disponível"""
     try:
+        print(f"DEBUG escolher_plantao: plantao_id={plantao_id}")
+        
         user = get_current_user()
+        print(f"DEBUG escolher_plantao: user={user.id if user else 'None'}, tipo={user.tipo if user else 'None'}")
+        
         hoje = date.today()
         agora = datetime.utcnow()
         
@@ -170,6 +174,8 @@ def escolher_plantao(plantao_id):
         
         # Buscar plantão
         plantao = Plantao.query.get(plantao_id)
+        print(f"DEBUG escolher_plantao: plantao found={plantao is not None}")
+        
         if not plantao:
             return criar_erro('Plantão não encontrado', 404)
         
@@ -527,7 +533,11 @@ def deletar_plantao(plantao_id):
 def atribuir_plantonista(plantao_id):
     """Gestor atribui manualmente um plantonista a um plantão"""
     try:
+        print(f"DEBUG atribuir_plantonista: plantao_id={plantao_id}")
+        
         data = request.get_json()
+        print(f"DEBUG atribuir_plantonista: data={data}")
+        
         plantonista_id = data.get('plantonista_id')
         
         if not plantonista_id:
@@ -537,6 +547,8 @@ def atribuir_plantonista(plantao_id):
         try:
             plantao = Plantao.query.get(plantao_id)
             plantonista = Plantonista.query.get(plantonista_id)
+            
+            print(f"DEBUG atribuir_plantonista: plantao found={plantao is not None}, plantonista found={plantonista is not None}")
             
             if not plantao or not plantonista:
                 return criar_erro('Plantão ou Plantonista não encontrado', 404)
