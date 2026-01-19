@@ -96,10 +96,9 @@ export const ShiftDistributionChart = ({ data }) => {
               outerRadius={80}
               fill="#8884d8"
               dataKey="value"
-            >
-              {data.map((entry, index) => (
+            >              {data && data.length > 0 ? data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={SHIFT_COLORS[index % SHIFT_COLORS.length]} />
-              ))}
+              )) : null}
             </Pie>
             <Tooltip />
           </PieChart>
@@ -110,28 +109,28 @@ export const ShiftDistributionChart = ({ data }) => {
 };
 
 // Componente para métricas em tempo real
-export const RealTimeMetrics = ({ metrics }) => {
+export const RealTimeMetrics = ({ metrics = {} }) => {
   const metricCards = [
     {
       title: 'Plantões Hoje',
-      value: metrics.plantoesHoje || 0,
-      change: metrics.changeHoje || 0,
+      value: metrics?.plantoesHoje || 0,
+      change: metrics?.changeHoje || 0,
       icon: FiCalendar,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50'
     },
     {
       title: 'Plantonistas Ativos',
-      value: metrics.plantonistasAtivos || 0,
-      change: metrics.changeAtivos || 0,
+      value: metrics?.plantonistasAtivos || 0,
+      change: metrics?.changeAtivos || 0,
       icon: FiUsers,
       color: 'text-green-600',
       bgColor: 'bg-green-50'
     },
     {
-      title: 'Taxa de Cancelamento',
-      value: `${metrics.taxaCancelamento || 0}%`,
-      change: metrics.changeCancelamento || 0,
+      title: 'Taxa Cancelamento',
+      value: `${metrics?.taxaCancelamento || 0}%`,
+      change: metrics?.changeCancelamento || 0,
       icon: FiActivity,
       color: 'text-amber-600',
       bgColor: 'bg-amber-50'
@@ -168,25 +167,25 @@ export const RealTimeMetrics = ({ metrics }) => {
 };
 
 // Componente para KPIs avançados
-export const AdvancedKPIs = ({ kpis }) => {
+export const AdvancedKPIs = ({ kpis = {} }) => {
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg p-6 text-white mb-6">
-      <h3 className="text-xl font-bold mb-4">KPIs Executivos</h3>
+    <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-xl p-6 text-white">
+      <h3 className="text-xl font-bold mb-6 text-center">KPIs Executivos</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <div className="text-center">
-          <p className="text-3xl font-black">{kpis.eficienciaOperacional || '95'}%</p>
+          <p className="text-3xl font-black">{kpis?.eficienciaOperacional || '95'}%</p>
           <p className="text-blue-100 text-sm">Eficiência Operacional</p>
         </div>
         <div className="text-center">
-          <p className="text-3xl font-black">{kpis.satisfacaoEquipe || '4.8'}</p>
+          <p className="text-3xl font-black">{kpis?.satisfacaoEquipe || '4.8'}</p>
           <p className="text-blue-100 text-sm">Satisfação da Equipe</p>
         </div>
         <div className="text-center">
-          <p className="text-3xl font-black">{kpis.tempoResposta || '2.1'}h</p>
+          <p className="text-3xl font-black">{kpis?.tempoResposta || '2.1'}h</p>
           <p className="text-blue-100 text-sm">Tempo Resp. Média</p>
         </div>
         <div className="text-center">
-          <p className="text-3xl font-black">{kpis.produtividade || '127'}%</p>
+          <p className="text-3xl font-black">{kpis?.produtividade || '125'}</p>
           <p className="text-blue-100 text-sm">Índice Produtividade</p>
         </div>
       </div>
@@ -195,12 +194,14 @@ export const AdvancedKPIs = ({ kpis }) => {
 };
 
 // Componente para timeline de atividades
-export const ActivityTimeline = ({ activities }) => {
+export const ActivityTimeline = ({ activities = [] }) => {
+  const safeActivities = activities && Array.isArray(activities) ? activities : [];
+  
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-50 p-6">
       <h3 className="text-lg font-bold text-gray-900 mb-4">Atividades Recentes</h3>
       <div className="space-y-4 max-h-64 overflow-y-auto">
-        {activities.map((activity, index) => (
+        {safeActivities.length > 0 ? safeActivities.map((activity, index) => (
           <div key={index} className="flex items-start space-x-3">
             <div className={`w-2 h-2 rounded-full mt-2 ${
               activity.type === 'success' ? 'bg-green-500' :
@@ -212,7 +213,11 @@ export const ActivityTimeline = ({ activities }) => {
               <p className="text-xs text-gray-500">{activity.timestamp}</p>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="text-center text-gray-500 py-8">
+            <p>Nenhuma atividade recente</p>
+          </div>
+        )}
       </div>
     </div>
   );
