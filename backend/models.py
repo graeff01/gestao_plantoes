@@ -125,9 +125,13 @@ class Plantao(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
-    alocacoes = db.relationship('Alocacao', backref='plantao', lazy='dynamic', cascade='all, delete-orphan')
+    alocacoes = db.relationship('Alocacao', backref='plantao', lazy='select', cascade='all, delete-orphan')
     
     def to_dict(self):
+        # Contar alocações de forma simples
+        alocacoes_count = len(self.alocacoes) if self.alocacoes else 0
+        alocacoes_confirmadas = len([a for a in (self.alocacoes or []) if a.status == 'confirmado'])
+        
         return {
             'id': str(self.id),
             'data': self.data.isoformat() if self.data else None,
@@ -135,8 +139,8 @@ class Plantao(db.Model):
             'status': self.status,
             'max_plantonistas': self.max_plantonistas,
             'observacoes': self.observacoes,
-            'alocacoes_count': self.alocacoes.count(),
-            'vagas_disponiveis': self.max_plantonistas - self.alocacoes.filter_by(status='confirmado').count()
+            'alocacoes_count': alocacoes_count,
+            'vagas_disponiveis': self.max_plantonistas - alocacoes_confirmadas
         }
 
 
