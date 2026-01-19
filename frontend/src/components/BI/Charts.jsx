@@ -11,15 +11,29 @@ const COLORS = {
 };
 
 // Componente para gráfico de tendência de ocupação
-export const OccupancyTrendChart = ({ data }) => {
+export const OccupancyTrendChart = ({ data = [] }) => {
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-gray-50 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">Tendência de Ocupação</h3>
+          <FiTrendingUp className="text-blue-500" size={20} />
+        </div>
+        <div className="h-64 min-h-[250px] flex items-center justify-center">
+          <p className="text-gray-500">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-50 p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-gray-900">Tendência de Ocupação</h3>
         <FiTrendingUp className="text-blue-500" size={20} />
       </div>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 min-h-[250px]">
+        <ResponsiveContainer width="100%" height="100%" minHeight={250}>
           <AreaChart data={data}>
             <defs>
               <linearGradient id="colorOccupancy" x1="0" y1="0" x2="0" y2="1">
@@ -46,15 +60,29 @@ export const OccupancyTrendChart = ({ data }) => {
 };
 
 // Componente para gráfico de performance dos plantonistas
-export const PerformanceChart = ({ data }) => {
+export const PerformanceChart = ({ data = [] }) => {
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg border border-gray-50 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-900">Performance Top 10</h3>
+          <FiActivity className="text-purple-500" size={20} />
+        </div>
+        <div className="h-64 min-h-[250px] flex items-center justify-center">
+          <p className="text-gray-500">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-50 p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-bold text-gray-900">Performance Top 10</h3>
         <FiActivity className="text-purple-500" size={20} />
       </div>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 min-h-[250px]">
+        <ResponsiveContainer width="100%" height="100%" minHeight={250}>
           <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
