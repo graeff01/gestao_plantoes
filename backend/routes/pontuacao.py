@@ -213,44 +213,44 @@ def deletar_pontuacao(pontuacao_id):
 def get_estatisticas():
     """Retorna estatísticas gerais de pontuação e plantões"""
     try:
-        # Usar uma única query para plantonista com mais pontos
-        top_query = db.session.query(
-            Usuario.nome,
-            Plantonista.pontuacao_total
-        ).join(Plantonista, Usuario.id == Plantonista.usuario_id)\
-         .order_by(Plantonista.pontuacao_total.desc())\
-         .first()
+        # Plantonista com mais pontos - query simples
+        top_plantonista = db.session.query(Usuario.nome)\
+            .join(Plantonista)\
+            .order_by(Plantonista.pontuacao_total.desc())\
+            .first()
         
-        top_nome = top_query.nome if top_query else None
+        top_nome = top_plantonista.nome if top_plantonista else None
         
-        # Queries otimizadas em paralelo
+        # Estatísticas do mês atual - queries separadas e simples
         hoje = date.today()
         primeiro_dia = hoje.replace(day=1)
         
-        # Single query para estatísticas do mês
-        stats_query = db.session.query(
-            db.func.sum(Pontuacao.pontos_total).label('total_pontos'),
-            db.func.sum(Plantao.max_plantonistas).label('total_vagas'),
-            db.func.count(Alocacao.id).label('vagas_preenchidas')
-        ).select_from(Plantao)\
-         .outerjoin(Alocacao, 
-            db.and_(Plantao.id == Alocacao.plantao_id, Alocacao.status == 'confirmado'))\
-         .outerjoin(Pontuacao, 
-            Pontuacao.mes_referencia == primeiro_dia)\
-         .filter(
+        # Total de pontos
+        total_pontos = db.session.query(db.func.sum(Pontuacao.pontos_total))\
+            .filter(Pontuacao.mes_referencia == primeiro_dia)\
+            .scalar() or 0
+        
+        # Plantões do mês
+        plantoes_mes = Plantao.query.filter(
             Plantao.data >= primeiro_dia,
             Plantao.data <= hoje
-        ).first()
+        ).all()
         
-        total_pontos = float(stats_query.total_pontos or 0)
-        total_vagas = int(stats_query.total_vagas or 0)
-        vagas_preenchidas = int(stats_query.vagas_preenchidas or 0)
+        total_vagas = sum(p.max_plantonistas for p in plantoes_mes)
+        
+        # Alocações confirmadas
+        vagas_preenchidas = Alocacao.query.join(Plantao).filter(
+            Plantao.data >= primeiro_dia,
+            Plantao.data <= hoje,
+            Alocacao.status == 'confirmado'
+        ).count()
+        
         taxa_ocupacao = (vagas_preenchidas / total_vagas * 100) if total_vagas > 0 else 0.0
         
         return criar_resposta(dados={
-            'total_pontos': total_pontos,
+            'total_pontos': float(total_pontos),
             'taxa_ocupacao': round(float(taxa_ocupacao), 1),
-            'vagas_preenchidas': vagas_preenchidas,
+            'vagas_preenchidas': int(vagas_preenchidas),
             'total_vagas': total_vagas,
             'top_plantonista': top_nome
         })

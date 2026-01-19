@@ -207,13 +207,11 @@ def escolher_plantao(plantao_id):
         
         # Verificar limite de plantões do mês
         mes_plantao = plantao.data.replace(day=1)
-        # SQLite compatibility: use month string comparison instead of date_trunc
-        mes_str = mes_plantao.strftime('%Y-%m')
-        
+        # PostgreSQL compatibility: use date_trunc for month comparison  
         plantoes_mes = Alocacao.query.join(Plantao).filter(
             Alocacao.plantonista_id == plantonista.id,
             Alocacao.status == 'confirmado',
-            db.func.strftime('%Y-%m', Plantao.data) == mes_str
+            db.func.date_trunc('month', Plantao.data) == mes_plantao
         ).count()
         
         if plantoes_mes >= plantonista.max_plantoes_mes:
