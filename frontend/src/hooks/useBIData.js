@@ -133,14 +133,6 @@ const useBIData = () => {
             // Em caso de erro total, usar apenas dados mock
             setData(getMockData());
             setError(null); // Não mostrar erro pois temos fallback
-            // Atualizar com dados reais (se disponíveis) + mock (como fallback)
-            setData(realData);
-            
-        } catch (err) {
-            console.error('Erro geral ao buscar dados BI:', err);
-            // Em caso de erro total, usar apenas dados mock
-            setData(getMockData());
-            setError(null); // Não mostrar erro pois temos fallback
         } finally {
             setLoading(false);
         }
