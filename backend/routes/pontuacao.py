@@ -97,30 +97,38 @@ def criar_pontuacao():
         if not plantonista:
             return criar_erro('Plantonista não encontrado', 404)
         
-        # Criar/atualizar pontuação
-        calc = CalculadoraPontuacao()
-        
-        dados_pontuacao = {
-            'vendas': data.get('vendas', 0),
-            'agenciamentos_vendidos': data.get('agenciamentos_vendidos', 0),
-            'age_bairro_foco': data.get('age_bairro_foco', 0),
-            'age_canoas_poa': data.get('age_canoas_poa', 0),
-            'age_outros': data.get('age_outros', 0),
-            'acima_1mm': data.get('acima_1mm', 0),
-            'placa_bairro_foco': data.get('placa_bairro_foco', 0),
-            'placa_canoas_poa': data.get('placa_canoas_poa', 0),
-            'placa_outros': data.get('placa_outros', 0)
-        }
-        
-        pontuacao = calc.criar_pontuacao_mes(
-            plantonista_id,
-            mes_referencia,
-            dados_pontuacao
-        )
-        
-        # Log da ação
-        user = get_current_user()
-        log_acao(user.id, 'criar_pontuacao', 'pontuacao', pontuacao.id, detalhes=dados_pontuacao)
+        # Transação atômica para operação crítica
+        try:
+            with db.session.begin():
+                calc = CalculadoraPontuacao()
+                
+                dados_pontuacao = {
+                    'vendas': data.get('vendas', 0),
+                    'agenciamentos_vendidos': data.get('agenciamentos_vendidos', 0),
+                    'age_bairro_foco': data.get('age_bairro_foco', 0),
+                    'age_canoas_poa': data.get('age_canoas_poa', 0),
+                    'age_outros': data.get('age_outros', 0),
+                    'acima_1mm': data.get('acima_1mm', 0),
+                    'placa_bairro_foco': data.get('placa_bairro_foco', 0),
+                    'placa_canoas_poa': data.get('placa_canoas_poa', 0),
+                    'placa_outros': data.get('placa_outros', 0)
+                }
+                
+                pontuacao = calc.criar_pontuacao_mes(
+                    plantonista_id,
+                    mes_referencia,
+                    dados_pontuacao
+                )
+                
+                # Log da ação
+                user = get_current_user()
+                log_acao(user.id, 'criar_pontuacao', 'pontuacao', pontuacao.id, detalhes=dados_pontuacao)
+                
+                # Commit implícito pelo context manager
+                
+        except Exception as e:
+            db.session.rollback()
+            raise e
         
         return criar_resposta(
             mensagem='Pontuação criada/atualizada com sucesso',
@@ -129,7 +137,6 @@ def criar_pontuacao():
         )
         
     except Exception as e:
-        db.session.rollback()
         return criar_erro(f'Erro ao criar pontuação: {str(e)}', 500)
 
 
@@ -206,44 +213,49 @@ def deletar_pontuacao(pontuacao_id):
 def get_estatisticas():
     """Retorna estatísticas gerais de pontuação e plantões"""
     try:
-        # Total de pontos distribuídos
-        total_p = db.session.query(db.func.sum(Pontuacao.pontos_total)).scalar()
-        total_pontos = float(total_p) if total_p is not None else 0.0
+        # Usar uma única query para plantonista com mais pontos
+        top_query = db.session.query(
+            Usuario.nome,
+            Plantonista.pontuacao_total
+        ).join(Plantonista, Usuario.id == Plantonista.usuario_id)\
+         .order_by(Plantonista.pontuacao_total.desc())\
+         .first()
         
-        # Plantonista com mais pontos
-        top_p = Plantonista.query.order_by(Plantonista.pontuacao_total.desc()).first()
-        top_nome = None
-        if top_p and top_p.usuario:
-            top_nome = top_p.usuario.nome
+        top_nome = top_query.nome if top_query else None
         
-        # Ocupação de plantões (mês atual)
+        # Queries otimizadas em paralelo
         hoje = date.today()
         primeiro_dia = hoje.replace(day=1)
         
-        res_vagas = db.session.query(db.func.sum(Plantao.max_plantonistas)).filter(
+        # Single query para estatísticas do mês
+        stats_query = db.session.query(
+            db.func.sum(Pontuacao.pontos_total).label('total_pontos'),
+            db.func.sum(Plantao.max_plantonistas).label('total_vagas'),
+            db.func.count(Alocacao.id).label('vagas_preenchidas')
+        ).select_from(Plantao)\
+         .outerjoin(Alocacao, 
+            db.and_(Plantao.id == Alocacao.plantao_id, Alocacao.status == 'confirmado'))\
+         .outerjoin(Pontuacao, 
+            Pontuacao.mes_referencia == primeiro_dia)\
+         .filter(
             Plantao.data >= primeiro_dia,
             Plantao.data <= hoje
-        ).scalar()
-        total_vagas = int(res_vagas) if res_vagas is not None else 0
+        ).first()
         
-        vagas_preenchidas = Alocacao.query.join(Plantao).filter(
-            Plantao.data >= primeiro_dia,
-            Plantao.data <= hoje,
-            Alocacao.status == 'confirmado'
-        ).count()
-        
+        total_pontos = float(stats_query.total_pontos or 0)
+        total_vagas = int(stats_query.total_vagas or 0)
+        vagas_preenchidas = int(stats_query.vagas_preenchidas or 0)
         taxa_ocupacao = (vagas_preenchidas / total_vagas * 100) if total_vagas > 0 else 0.0
         
         return criar_resposta(dados={
             'total_pontos': total_pontos,
             'taxa_ocupacao': round(float(taxa_ocupacao), 1),
-            'vagas_preenchidas': int(vagas_preenchidas),
+            'vagas_preenchidas': vagas_preenchidas,
             'total_vagas': total_vagas,
             'top_plantonista': top_nome
         })
         
     except Exception as e:
-        print(f"DEBUG ESTATISTICAS: {str(e)}") # Log no terminal
         return criar_erro(f'Erro ao buscar estatísticas: {str(e)}', 500)
 
 @pontuacao_bp.route('/meu-desempenho', methods=['GET'])

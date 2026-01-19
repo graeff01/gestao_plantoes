@@ -4,6 +4,7 @@ from models import db, Plantao, Alocacao, Plantonista, Usuario
 from utils.auth import gestor_required, criar_resposta, criar_erro, log_acao, get_current_user
 from datetime import datetime, date, timedelta
 from calendar import monthrange
+from sqlalchemy.orm import joinedload
 import uuid
 
 plantao_bp = Blueprint('plantao', __name__, url_prefix='/api/plantoes')
@@ -17,7 +18,12 @@ def get_plantoes():
         inicio = request.args.get('inicio')
         fim = request.args.get('fim')
         
-        query = Plantao.query
+        # Query otimizada com eager loading
+        query = db.session.query(Plantao).options(
+            db.joinedload(Plantao.alocacoes)
+            .joinedload(Alocacao.plantonista)
+            .joinedload(Plantonista.usuario)
+        )
         
         if inicio:
             query = query.filter(Plantao.data >= datetime.strptime(inicio, '%Y-%m-%d').date())
@@ -29,9 +35,9 @@ def get_plantoes():
         resultado = []
         for plantao in plantoes:
             plantao_dict = plantao.to_dict()
-            # Buscar alocações
-            alocacoes = Alocacao.query.filter_by(plantao_id=plantao.id, status='confirmado').all()
-            plantao_dict['alocacoes'] = [a.to_dict() for a in alocacoes]
+            # As alocações já foram carregadas com eager loading
+            alocacoes_confirmadas = [a for a in plantao.alocacoes if a.status == 'confirmado']
+            plantao_dict['alocacoes'] = [a.to_dict() for a in alocacoes_confirmadas]
             resultado.append(plantao_dict)
             
         return criar_resposta(dados={'plantoes': resultado})
@@ -47,8 +53,12 @@ def get_plantoes_mes(ano, mes):
         primeiro_dia = date(int(ano), int(mes), 1)
         ultimo_dia = date(int(ano), int(mes), monthrange(int(ano), int(mes))[1])
         
-        # Buscar plantões
-        plantoes = Plantao.query.filter(
+        # Query otimizada com eager loading
+        plantoes = db.session.query(Plantao).options(
+            db.joinedload(Plantao.alocacoes)
+            .joinedload(Alocacao.plantonista)
+            .joinedload(Plantonista.usuario)
+        ).filter(
             Plantao.data >= primeiro_dia,
             Plantao.data <= ultimo_dia
         ).order_by(Plantao.data, Plantao.turno).all()
@@ -57,13 +67,8 @@ def get_plantoes_mes(ano, mes):
         resultado = []
         for plantao in plantoes:
             plantao_dict = plantao.to_dict()
-            
-            # Buscar alocações
-            alocacoes = Alocacao.query.filter_by(
-                plantao_id=plantao.id
-            ).all()
-            
-            plantao_dict['alocacoes'] = [a.to_dict() for a in alocacoes]
+            # As alocações já foram carregadas
+            plantao_dict['alocacoes'] = [a.to_dict() for a in plantao.alocacoes]
             resultado.append(plantao_dict)
         
         return criar_resposta(dados={'plantoes': resultado})
@@ -255,32 +260,46 @@ def escolher_plantao(plantao_id):
         # Mas a janela de horário já resolve 99% dos casos se respeitada.
         # ----------------------------------------
         
-        # Criar alocação
-        alocacao = Alocacao(
-            plantao_id=plantao_id,
-            plantonista_id=plantonista.id,
-            status='confirmado',
-            tipo='escolha',
-            confirmado_em=datetime.utcnow()
-        )
-        
-        db.session.add(alocacao)
-        
-        # Atualizar status do plantão se necessário
-        alocacoes_confirmadas += 1
-        if alocacoes_confirmadas >= plantao.max_plantonistas:
-            plantao.status = 'confirmado'
-        else:
-            plantao.status = 'reservado'
-        
-        db.session.commit()
-        
-        # Log da ação
-        log_acao(user.id, 'escolher_plantao', 'alocacoes', alocacao.id, detalhes={
-            'plantao_id': str(plantao_id),
-            'data': plantao.data.isoformat(),
-            'turno': plantao.turno
-        })
+        # Criar alocação com transação atômica
+        try:
+            with db.session.begin():
+                # Re-verificar disponibilidade dentro da transação (proteção contra concorrência)
+                alocacoes_atuais = Alocacao.query.filter_by(
+                    plantao_id=plantao_id,
+                    status='confirmado'
+                ).count()
+                
+                if alocacoes_atuais >= plantao.max_plantonistas:
+                    return criar_erro('Plantão sem vagas disponíveis (verificação final)', 400)
+                
+                alocacao = Alocacao(
+                    plantao_id=plantao_id,
+                    plantonista_id=plantonista.id,
+                    status='confirmado',
+                    tipo='escolha',
+                    confirmado_em=datetime.utcnow()
+                )
+                
+                db.session.add(alocacao)
+                
+                # Atualizar status do plantão
+                alocacoes_confirmadas = alocacoes_atuais + 1
+                if alocacoes_confirmadas >= plantao.max_plantonistas:
+                    plantao.status = 'confirmado'
+                else:
+                    plantao.status = 'reservado'
+                
+                # Log da ação
+                log_acao(user.id, 'escolher_plantao', 'alocacoes', alocacao.id, detalhes={
+                    'plantao_id': str(plantao_id),
+                    'data': plantao.data.isoformat(),
+                    'turno': plantao.turno
+                })
+                
+                # Commit implícito pelo context manager
+        except Exception as e:
+            db.session.rollback()
+            raise e
         
         return criar_resposta(
             mensagem='Plantão escolhido com sucesso',
