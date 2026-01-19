@@ -564,7 +564,21 @@ def atribuir_plantonista(plantao_id):
         # Operações sem transação dupla
         try:
             plantao = Plantao.query.get(plantao_id)
+            print(f"DEBUG atribuir_plantonista: plantao query result={plantao}")
+            
+            # Tentar buscar plantonista por ID direto
             plantonista = Plantonista.query.get(plantonista_id)
+            print(f"DEBUG atribuir_plantonista: plantonista direct query={plantonista}")
+            
+            # Se não encontrou, tentar buscar por usuario_id (caso frontend esteja enviando usuario_id)
+            if not plantonista:
+                plantonista = Plantonista.query.filter_by(usuario_id=plantonista_id).first()
+                print(f"DEBUG atribuir_plantonista: plantonista by usuario_id={plantonista}")
+            
+            # Buscar também por nome para debug
+            if data and 'nome' in data:
+                plantonista_por_nome = Plantonista.query.join(Usuario).filter(Usuario.nome.ilike(f"%{data['nome']}%")).first()
+                print(f"DEBUG atribuir_plantonista: plantonista by name={plantonista_por_nome}")
             
             print(f"DEBUG atribuir_plantonista: plantao found={plantao is not None}, plantonista found={plantonista is not None}")
             
@@ -673,3 +687,55 @@ def remover_alocacao(plantao_id):
     except Exception as e:
         db.session.rollback()
         return criar_erro(f'Erro ao remover alocação: {str(e)}', 500)
+
+
+@plantao_bp.route('/debug/plantonistas', methods=['GET'])
+@jwt_required()
+def debug_plantonistas():
+    """Debug: lista todos plantonistas para investigação"""
+    try:
+        plantonistas = Plantonista.query.join(Usuario).all()
+        resultado = []
+        
+        for p in plantonistas:
+            resultado.append({
+                'id': str(p.id),
+                'usuario_id': str(p.usuario_id),
+                'nome': p.usuario.nome if p.usuario else 'Sem usuário',
+                'email': p.usuario.email if p.usuario else 'Sem email',
+                'ranking': p.ranking
+            })
+        
+        return criar_resposta(
+            mensagem=f'Debug: {len(resultado)} plantonistas encontrados',
+            dados={'plantonistas': resultado}
+        )
+        
+    except Exception as e:
+        return criar_erro(f'Erro debug: {str(e)}', 500)
+
+
+@plantao_bp.route('/debug/plantoes', methods=['GET'])  
+@jwt_required()
+def debug_plantoes():
+    """Debug: lista plantões disponíveis"""
+    try:
+        plantoes = Plantao.query.filter(Plantao.data >= date.today()).order_by(Plantao.data).limit(10).all()
+        resultado = []
+        
+        for p in plantoes:
+            resultado.append({
+                'id': str(p.id),
+                'data': p.data.isoformat(),
+                'turno': p.turno,
+                'status': p.status,
+                'max_plantonistas': p.max_plantonistas
+            })
+        
+        return criar_resposta(
+            mensagem=f'Debug: {len(resultado)} plantões encontrados',
+            dados={'plantoes': resultado}
+        )
+        
+    except Exception as e:
+        return criar_erro(f'Erro debug: {str(e)}', 500)
