@@ -97,34 +97,33 @@ def criar_pontuacao():
         if not plantonista:
             return criar_erro('Plantonista não encontrado', 404)
         
-        # Transação atômica para operação crítica
+        # Operação atômica
         try:
-            with db.session.begin():
-                calc = CalculadoraPontuacao()
-                
-                dados_pontuacao = {
-                    'vendas': data.get('vendas', 0),
-                    'agenciamentos_vendidos': data.get('agenciamentos_vendidos', 0),
-                    'age_bairro_foco': data.get('age_bairro_foco', 0),
-                    'age_canoas_poa': data.get('age_canoas_poa', 0),
-                    'age_outros': data.get('age_outros', 0),
-                    'acima_1mm': data.get('acima_1mm', 0),
-                    'placa_bairro_foco': data.get('placa_bairro_foco', 0),
-                    'placa_canoas_poa': data.get('placa_canoas_poa', 0),
-                    'placa_outros': data.get('placa_outros', 0)
-                }
-                
-                pontuacao = calc.criar_pontuacao_mes(
-                    plantonista_id,
-                    mes_referencia,
-                    dados_pontuacao
-                )
-                
-                # Log da ação
-                user = get_current_user()
-                log_acao(user.id, 'criar_pontuacao', 'pontuacao', pontuacao.id, detalhes=dados_pontuacao)
-                
-                # Commit implícito pelo context manager
+            calc = CalculadoraPontuacao()
+            
+            dados_pontuacao = {
+                'vendas': data.get('vendas', 0),
+                'agenciamentos_vendidos': data.get('agenciamentos_vendidos', 0),
+                'age_bairro_foco': data.get('age_bairro_foco', 0),
+                'age_canoas_poa': data.get('age_canoas_poa', 0),
+                'age_outros': data.get('age_outros', 0),
+                'acima_1mm': data.get('acima_1mm', 0),
+                'placa_bairro_foco': data.get('placa_bairro_foco', 0),
+                'placa_canoas_poa': data.get('placa_canoas_poa', 0),
+                'placa_outros': data.get('placa_outros', 0)
+            }
+            
+            pontuacao = calc.criar_pontuacao_mes(
+                plantonista_id,
+                mes_referencia,
+                dados_pontuacao
+            )
+            
+            # Log da ação
+            user = get_current_user()
+            log_acao(user.id, 'criar_pontuacao', 'pontuacao', pontuacao.id, detalhes=dados_pontuacao)
+            
+            db.session.commit()
                 
         except Exception as e:
             db.session.rollback()
