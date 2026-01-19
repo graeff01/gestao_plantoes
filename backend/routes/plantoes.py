@@ -552,7 +552,9 @@ def atribuir_plantonista(plantao_id):
         # Atualizar status do plantão
         alocacoes_count = Alocacao.query.filter_by(plantao_id=plantao_id, status='confirmado').count() + 1
         if alocacoes_count >= plantao.max_plantonistas:
-            plantao.status = 'lotado'
+            plantao.status = 'confirmado'
+        else:
+            plantao.status = 'reservado'
         
         db.session.commit()
         
