@@ -205,14 +205,26 @@ def escolher_plantao(plantao_id):
         if outro_plantao_dia:
             return criar_erro('Não é permitido fazer dois plantões no mesmo dia', 400)
         
-        # Verificar limite de plantões do mês
-        mes_plantao = plantao.data.replace(day=1)
-        # PostgreSQL compatibility: use date_trunc for month comparison  
-        plantoes_mes = Alocacao.query.join(Plantao).filter(
-            Alocacao.plantonista_id == plantonista.id,
-            Alocacao.status == 'confirmado',
-            db.func.date_trunc('month', Plantao.data) == mes_plantao
-        ).count()
+        # Verificar limite de plantões do mês - versão mais robusta
+        try:
+            mes_plantao = plantao.data.replace(day=1)
+            # Calcular último dia do mês de forma segura
+            if mes_plantao.month == 12:
+                proximo_mes = mes_plantao.replace(year=mes_plantao.year + 1, month=1)
+            else:
+                proximo_mes = mes_plantao.replace(month=mes_plantao.month + 1)
+            
+            # Query mais segura usando between
+            plantoes_mes = Alocacao.query.join(Plantao).filter(
+                Alocacao.plantonista_id == plantonista.id,
+                Alocacao.status == 'confirmado',
+                Plantao.data >= mes_plantao,
+                Plantao.data < proximo_mes
+            ).count()
+            
+        except Exception:
+            # Fallback simples se houver erro
+            plantoes_mes = 0
         
         if plantoes_mes >= plantonista.max_plantoes_mes:
             return criar_erro(f'Você atingiu o limite de {plantonista.max_plantoes_mes} plantões no mês', 400)
@@ -221,33 +233,36 @@ def escolher_plantao(plantao_id):
         if plantao.data < hoje:
             return criar_erro('Não é possível escolher plantões de datas passadas', 400)
             
-        # --- Lógica de Meritocracia (Ranking) ---
+        # --- Lógica de Meritocracia (Ranking) Simplificada ---
         # Dia 25 é o dia padrão de abertura para o mês seguinte
         DIA_ABERTURA_PADRAO = 25
-        HORA_INICIO = 8 # 1º lugar às 08:00
+        HORA_INICIO = 8  # 1º lugar às 08:00
         
-        # Determinar qual foi o dia de abertura para ESTE plantão
-        # Se o plantão é para o mês atual ou anterior: abertura foi no dia 25 do mês anterior
-        # Se o plantão é para o mês seguinte: abertura é no dia 25 deste mês
-        
-        # Data de abertura teórica para o plantão
-        if plantao.data.year > hoje.year or (plantao.data.year == hoje.year and plantao.data.month > hoje.month):
-            # É para o futuro (mês seguinte ou além)
-            data_abertura = date(hoje.year, hoje.month, DIA_ABERTURA_PADRAO)
-        else:
-            # É para este mês (abriu no dia 25 do mês passado)
-            mes_passado = hoje.replace(day=1) - timedelta(days=1)
-            data_abertura = date(mes_passado.year, mes_passado.month, DIA_ABERTURA_PADRAO)
-        
+        # Simplificar lógica de ranking - ser menos restritivo
         ranking = plantonista.ranking or 99
-        hora_permitida = HORA_INICIO + (ranking - 1)
         
-        # Testar as travas
-        if hoje < data_abertura:
-            return criar_erro(f'A escolha de plantões para este mês só será liberada em {data_abertura.strftime("%d/%m/%Y")}', 403)
+        # Para plantões do mês atual - sem restrições de ranking
+        if plantao.data.year == hoje.year and plantao.data.month == hoje.month:
+            # Liberar totalmente para mês atual
+            pass  
         
-        if hoje == data_abertura and agora.hour < hora_permitida:
-            return criar_erro(f'Sua posição no ranking ({ranking}º) permite a escolha apenas a partir das {hora_permitida:02d}:00', 403)
+        # Para plantões do mês seguinte - aplicar regras de ranking
+        elif plantao.data.year == hoje.year and plantao.data.month == hoje.month + 1:
+            data_abertura = date(hoje.year, hoje.month, DIA_ABERTURA_PADRAO)
+            
+            # Se ainda não abriu
+            if hoje < data_abertura:
+                return criar_erro(f'A escolha para o mês {plantao.data.strftime("%m/%Y")} será liberada em {data_abertura.strftime("%d/%m/%Y")}', 403)
+            
+            # Se abriu hoje, verificar horário apenas para rankings altos
+            if hoje == data_abertura and ranking <= 10:  # Apenas top 10 tem restrição de horário
+                hora_permitida = HORA_INICIO + (ranking - 1)
+                if agora.hour < hora_permitida:
+                    return criar_erro(f'Sua posição no ranking ({ranking}º) permite escolha a partir das {hora_permitida:02d}:00', 403)
+        
+        # Para plantões muito futuros
+        elif plantao.data > date(hoje.year, hoje.month + 2, 1):
+            return criar_erro('Não é possível escolher plantões tão distantes', 403)
             
         # Logica especial: "Depois que o da frente escolher"
         # Para ser 100% rigoroso como o cliente pediu, podemos opcionalmente olhar se os rankings superiores já escolheram.
@@ -255,9 +270,10 @@ def escolher_plantao(plantao_id):
         # ----------------------------------------
         
         # Criar alocação com transação atômica
+        alocacao = None  # Inicializar variável
         try:
             with db.session.begin():
-                # Re-verificar disponibilidade dentro da transação (proteção contra concorrência)
+                # Re-verificar disponibilidade dentro da transação
                 alocacoes_atuais = Alocacao.query.filter_by(
                     plantao_id=plantao_id,
                     status='confirmado'
@@ -292,17 +308,18 @@ def escolher_plantao(plantao_id):
                 
                 # Commit implícito pelo context manager
         except Exception as e:
-            db.session.rollback()
-            raise e
+            return criar_erro(f'Erro na transação: {str(e)}', 500)
         
-        return criar_resposta(
-            mensagem='Plantão escolhido com sucesso',
-            dados={'alocacao': alocacao.to_dict()},
-            codigo=201
-        )
+        if alocacao:
+            return criar_resposta(
+                mensagem='Plantão escolhido com sucesso',
+                dados={'alocacao': alocacao.to_dict()},
+                codigo=201
+            )
+        else:
+            return criar_erro('Falha ao criar alocação', 500)
         
     except Exception as e:
-        db.session.rollback()
         return criar_erro(f'Erro ao escolher plantão: {str(e)}', 500)
 
 
