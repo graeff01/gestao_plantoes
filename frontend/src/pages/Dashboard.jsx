@@ -1,8 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { FiCalendar, FiUsers, FiAward, FiTrendingUp, FiActivity } from 'react-icons/fi';
+import { FiCalendar, FiUsers, FiAward, FiTrendingUp, FiActivity, FiBarChart, FiPieChart } from 'react-icons/fi';
 import api from '../services/api';
 import { toast } from 'react-toastify';
+
+// Importar componentes BI
+import { 
+  OccupancyTrendChart, 
+  PerformanceChart, 
+  ShiftDistributionChart, 
+  RealTimeMetrics, 
+  AdvancedKPIs, 
+  ActivityTimeline 
+} from '../components/BI/Charts';
+import { useBIData } from '../hooks/useBIData';
 
 export default function Dashboard() {
   const { user } = useAuthStore();
@@ -19,6 +30,10 @@ export default function Dashboard() {
   const [ranking, setRanking] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAdvancedBI, setShowAdvancedBI] = useState(false);
+
+  // Hook para dados BI
+  const biData = useBIData();
 
   const isGestor = ['admin', 'gestor'].includes(user?.tipo);
 
@@ -125,9 +140,26 @@ export default function Dashboard() {
           </h1>
           <p className="text-gray-500 font-medium text-sm">Veja o que está acontecendo no sistema hoje.</p>
         </div>
-        <div className="flex items-center space-x-2 text-sm font-bold bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-gray-600">Sistema Operacional</span>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 text-sm font-bold bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-gray-600">Sistema Operacional</span>
+          </div>
+          
+          {/* Toggle BI Avançado (apenas para gestores) */}
+          {isGestor && (
+            <button
+              onClick={() => setShowAdvancedBI(!showAdvancedBI)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-xl shadow-sm border transition-all ${
+                showAdvancedBI 
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white border-blue-400' 
+                  : 'bg-white text-gray-600 border-gray-100 hover:border-blue-200'
+              }`}
+            >
+              <FiBarChart size={16} />
+              <span className="text-sm font-bold">BI Avançado</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -146,6 +178,30 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* BI Avançado (apenas para gestores quando ativado) */}
+      {isGestor && showAdvancedBI && !biData.loading && (
+        <div className="space-y-6">
+          {/* KPIs Executivos */}
+          <AdvancedKPIs kpis={biData.advancedKPIs} />
+
+          {/* Métricas em Tempo Real */}
+          <RealTimeMetrics metrics={biData.realTimeMetrics} />
+
+          {/* Grid de Gráficos */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <OccupancyTrendChart data={biData.occupancyTrend} />
+            <PerformanceChart data={biData.performanceData} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <ShiftDistributionChart data={biData.shiftDistribution} />
+            </div>
+            <ActivityTimeline activities={biData.activityTimeline} />
+          </div>
+        </div>
+      )}
 
       {/* Main Content Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 flex-1 min-h-0">

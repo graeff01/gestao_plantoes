@@ -1,10 +1,12 @@
 """
 Utilitários para cache Redis
 """
-from flask import current_app
+from flask import current_app, request
+from flask_jwt_extended import get_jwt_identity
 import json
 from datetime import datetime, date
 import hashlib
+from functools import wraps
 
 
 def get_cache_key(prefix, *args):
@@ -172,3 +174,56 @@ def invalidate_stats_cache():
 def invalidate_plantoes_cache():
     """Invalida cache de plantões"""
     cache_clear_pattern('plantoes_*')
+
+
+def cached_function(timeout=300, key_prefix='default'):
+    """
+    Decorator para cache de funções/rotas
+    
+    Args:
+        timeout (int): Tempo de cache em segundos
+        key_prefix (str): Prefixo para a chave do cache
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Verificar se cache está disponível
+            if not hasattr(current_app, 'cache'):
+                return f(*args, **kwargs)
+            
+            # Gerar chave única baseada na função, argumentos e usuário
+            user_id = get_jwt_identity() if get_jwt_identity() else 'anonymous'
+            
+            # Hash dos argumentos para garantir unicidade
+            args_hash = hashlib.md5(
+                json.dumps({
+                    'args': str(args),
+                    'kwargs': str(kwargs),
+                    'user': user_id,
+                    'path': request.path if request else 'no_request'
+                }, sort_keys=True).encode()
+            ).hexdigest()[:8]
+            
+            cache_key = f"{key_prefix}_{f.__name__}_{args_hash}"
+            
+            try:
+                # Tentar buscar do cache
+                cached_result = cache_get(cache_key)
+                if cached_result is not None:
+                    return cached_result
+                
+                # Se não encontrou no cache, executar função
+                result = f(*args, **kwargs)
+                
+                # Salvar no cache
+                cache_set(cache_key, result, timeout)
+                
+                return result
+                
+            except Exception as e:
+                # Se houver erro com cache, executar função normalmente
+                current_app.logger.warning(f"Erro no cache: {e}")
+                return f(*args, **kwargs)
+                
+        return decorated_function
+    return decorator

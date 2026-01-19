@@ -72,12 +72,14 @@ def create_app(config_name='development'):
     from routes.plantoes import plantao_bp
     from routes.logs import logs_bp
     from routes.health import health_bp
+    from routes.bi import bi_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(pontuacao_bp)
     app.register_blueprint(plantao_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(health_bp)
+    app.register_blueprint(bi_bp)
     
     # Configurar eventos Socket.IO
     @socketio.on('connect')
